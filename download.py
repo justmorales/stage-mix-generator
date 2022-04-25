@@ -37,7 +37,7 @@ def dl_handler(list, fmt):
     print(f"RUNNING ON {thread_count//2} threads")
 
     # TODO
-    ## optimize resource usage
+    #   optimize resource usage
     pool = Pool(thread_count//2)
     pool.starmap(dl_worker, zip(list, repeat(fmt)))
     pool.close()

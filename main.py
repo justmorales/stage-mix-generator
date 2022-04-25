@@ -1,7 +1,12 @@
 from query_utils import QueryObject
+from scenedetect.frame_timecode import FrameTimecode
 import download
+import mix_gen
 import pprint
 import urllib.parse as parse
+import os.path as path
+
+DIR = path.dirname(path.abspath(__file__))
 
 def main():
     artist = str(input("artist: "))
@@ -26,4 +31,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    scenes = (mix_gen.scene_detect(path.join(DIR,'temp','XmkIPTm7U8A.mp4')))
+    corrected_scenes = []
+    for i in range(len(scenes)):
+        corrected_scenes.append((scenes[i][0].get_timecode(), scenes[i][1].get_timecode()))
+    pprint.pprint(corrected_scenes)

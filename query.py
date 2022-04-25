@@ -45,7 +45,7 @@ def scroll_driver():
 
 def check_title(title, artist):
     # TODO:
-    ## come up with better way to filter videos based on titles
+    #   come up with better way to filter videos based on titles
     for term in BLACKLISTED_TERMS:
         if term in title.lower() or not artist in title.lower():
             return False
