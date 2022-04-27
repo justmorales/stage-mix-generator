@@ -18,28 +18,32 @@ OPTS = {
     }
 }
 
-# @param url string
-#   url to download
-# @param fmt 'v' or 'a'
-#   v for video, a for audio
-def dl_worker(url, fmt):
+def dl_worker(url: str, fmt: str):
+    """Downloads video from YouTube as given format
+
+    Args:
+        url (str): video url string
+        fmt (str): "a" for audio or "v" for video
+    """
     ydl_opts = OPTS["VIDEO"] if fmt == "v" else OPTS["AUDIO"]
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download(url)
 
-# @param list []
-#   list of urls to download
-# @param fmt 'v' or 'a'
-#   v for video, a for audio
-def dl_handler(list, fmt):
+def dl_handler(video_urls: [], fmt: str):
+    """Iterates through list and runs dl_worker() on multiple threads
+
+    Args:
+        video_urls (list): a list of video url strings
+        fmt (str): "a" for audio or "v" for video
+    """
     start = time.time()
-    thread_count = cpu_count()
-    print(f"RUNNING ON {thread_count//2} threads")
+    thread_count = cpu_count()//2
+    print(f"RUNNING ON {thread_count} threads")
 
     # TODO
     #   optimize resource usage
-    pool = Pool(thread_count//2)
-    pool.starmap(dl_worker, zip(list, repeat(fmt)))
+    pool = Pool(thread_count)
+    pool.starmap(dl_worker, zip(video_urls, repeat(fmt)))
     pool.close()
     pool.join()
 

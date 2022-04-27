@@ -1,50 +1,51 @@
-import scenedetect
-from scenedetect import VideoManager, SceneManager
-from scenedetect.frame_timecode import FrameTimecode
-from scenedetect.detectors import ContentDetector
+from scenedetect import VideoManager, SceneManager, StatsManager, ContentDetector, FrameTimecode
 from moviepy.editor import VideoFileClip, clips_array
 from cvcalib.audiosync import offset
-import urllib.parse as parse
-import os.path as path
+from query import url_to_id
+import os
 
-DIR = path.dirname(path.abspath(__file__))
-TEMPDIR = path.join(DIR, 'temp')
+DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPDIR = os.path.join(DIR, 'temp')
 
-def get_vid_offsets(qobject):
+
+def get_vid_offsets(video_urls: [str], audio_url: str) -> []:
+    """Get audio-video offsets (based on official audio) of downloaded stages
+
+    Args:
+        video_urls (list): a list of video url strings
+        audio_url (string): video url string
+
+    Returns:
+        offsets (list): ['path-to-video': (offset tuple)]
+    """
+
     video_filenames = []
+    audio_filename = url_to_id(audio_url)
 
-    # TODO
-    #   move this to query file as get_id or somethin
-    for url in qobject.video_urls:
-        url_data = parse.urlparse(url)
-        split_url = parse.parse_qs(url_data.query)
-        video_filenames.append(split_url['v'][0])
-    audio_filename = parse.parse_qs(parse.urlparse(qobject.audio_url).query)['v'][0]
+    for url in video_urls:
+        video_filenames.append(url_to_id(url))
 
     # finds the starting times of the song in each stage
     offsets = {}
     for file in video_filenames:
         vid_offset = offset.find_time_offset([f"{audio_filename}.m4a", f"{file}.m4a"], TEMPDIR, [0,0])
-        offsets[path.join(TEMPDIR, f"{file}.mp4")] = vid_offset[0]
+        offsets[os.path.join(TEMPDIR, f"{file}.mp4")] = vid_offset[0]
+    return offsets
 
-    return offsets  # ["path to video": (offset tuple)]
-
-
-# return 2 lists
-#   subclips converted to VideoFileClips
-#   path to each video used
 def subclip_vid(offsets):
+    """Cut videos to line up with official audio based on calculated offsets
+    
+    Args:
+        offsets (list): ['path-to-video': (offset tuple)]
+    
+    Returns:
+        video_subclips (list): a list of VideoFileClips
+        files_used (list): a list of paths to videos used
+    """
     video_subclips = []
     files_used = []
 
-    for video in offsets:
-        # TODO
-        ## DESPERATE NEED OF OPTIMIZATIONS
-        ## adjust for stages that start a little bit into the song
-        ## and stages that start extremely late but use snippets of the song in the intro
-        ## maybe find a new library? or implement fourier on my own
-
-        # check if the songs in the stages and official audio begin at the same time (NOT GOOD!!!)
+    for video in offsets: # optimize/fix
         if offsets[video][0] == 0:
             video_subclips.append(VideoFileClip(video).subclip(offsets[video][1]))
             files_used.append(video)
@@ -52,14 +53,42 @@ def subclip_vid(offsets):
     return video_subclips, files_used
 
 def scene_detect(video_path):
+    """Detects scenes in a video
+    
+    Args:
+        video_path (str): path to video
+    
+    Returns:
+        scene_list (list): [(start of scene, end of scene)]
+    """
     video_manager = VideoManager([video_path])
-    scene_manager = SceneManager()
+    stats_manager = StatsManager()
+    scene_manager = SceneManager(stats_manager)
     scene_manager.add_detector(ContentDetector(threshold=30.0))
 
-    # downscale video for faster processing
-    video_manager.set_downscale_factor()
+    stats_file_path = f"{video_path}.stats.csv"
 
-    video_manager.start()
-    scene_manager.detect_scenes(frame_source=video_manager)
-    
-    return scene_manager.get_scene_list()
+    scene_list = []
+
+    try:
+        if os.path.exists(stats_file_path):
+            with open(stats_file_path, 'r') as stats_file:
+                stats_manager.load_from_csv(stats_file)
+
+        # downscale video for faster processing
+        video_manager.set_downscale_factor()
+
+        video_manager.start()
+        scene_manager.detect_scenes(frame_source=video_manager)
+
+        scene_list = scene_manager.get_scene_list()
+
+        if stats_manager.is_save_required():
+            base_timecode = video_manager.get_base_timecode()
+            with open(stats_file_path, 'w') as stats_file:
+                stats_manager.save_to_csv(stats_file, base_timecode)
+    finally:
+        # release all cv capture processes MEMORY MANAGEMENT WOO
+        video_manager.release()
+
+    return scene_list
