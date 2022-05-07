@@ -1,12 +1,12 @@
 from scenedetect import VideoManager, SceneManager, StatsManager, ContentDetector, FrameTimecode
-from moviepy.editor import VideoFileClip, clips_array
+from moviepy.editor import AudioFileClip, VideoFileClip, concatenate_videoclips
 from cvcalib.audiosync import offset
 from query import url_to_id
+import numpy as np
 import os
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPDIR = os.path.join(DIR, 'temp')
-
 
 def get_vid_offsets(video_urls: [str], audio_url: str) -> []:
     """Get audio-video offsets (based on official audio) of downloaded stages
@@ -43,14 +43,16 @@ def subclip_vid(offsets):
         files_used (list): a list of paths to videos used
     """
     video_subclips = []
+    audio_subclips = []
     files_used = []
 
     for video in offsets: # optimize/fix
         if offsets[video][0] == 0:
             video_subclips.append(VideoFileClip(video).subclip(offsets[video][1]))
+            audio_subclips.append(AudioFileClip(f"{video[:-4]}.m4a").subclip(offsets[video][1]))
             files_used.append(video)
 
-    return video_subclips, files_used
+    return video_subclips, audio_subclips, files_used
 
 def scene_detect(video_path):
     """Detects scenes in a video
@@ -92,3 +94,39 @@ def scene_detect(video_path):
         video_manager.release()
 
     return scene_list
+
+def generate_mix(offsets, audio_id):
+    # GET FILES
+
+    # GET SUBCLIPS FROM OFFSETS
+    v_subclips, a_subclips, video_paths = subclip_vid(offsets)
+
+    # LOAD AUDIO
+    audio_path = os.path.join(TEMPDIR, f"{audio_id}.m4a")
+    official_audio = AudioFileClip(audio_path)
+
+    # CREATE ORDERED LIST OF SCENES
+    clips = []
+    index = 0
+    for step in np.arange(0, official_audio.duration, 5):
+        if step + 5 < v_subclips[index].duration:
+            clips.append(v_subclips[index].subclip(step, step + 5))
+
+        index = (index + 1) % len(v_subclips)
+
+    # ASSEMBLE VIDEO CLIPS
+    final = concatenate_videoclips(clips)
+    final = final.set_audio(a_subclips[0])
+
+    mix_path = os.path.join(DIR, "final_mix.mp4")
+    final.write_videofile(mix_path)
+
+    official_audio.reader.close_proc()
+
+    for video in v_subclips:
+        video.reader.close()
+    
+    for audio in a_subclips:
+        audio.reader.close_proc()
+
+    return mix_path

@@ -11,6 +11,7 @@ driver = webdriver.Firefox(service=Service(executable_path=GeckoDriverManager().
 #   get_audio_file()
 #   get_stage_files()
 
+PAUSE_TIME = 1.0
 WHITELISTED_CHANNELS = [    
     "Mnet",
     "SBSKPOPPLAY",
@@ -97,7 +98,7 @@ def search_videos(artist: str, song: str) -> [str]:
         video_urls (list): a list of video url strings
     """
     driver.get(f"https://www.youtube.com/results?search_query={artist}+{song}+stage")
-    scroll_driver(1.0)
+    scroll_driver(PAUSE_TIME)
     r = driver.page_source
 
     # find video content container

@@ -21,18 +21,7 @@ def main():
 
     offsets = vid_utils.get_vid_offsets(video_urls, audio_url)
     pprint(offsets)
-    subclips = vid_utils.subclip_vid(offsets)
-
-def generate_mix(offsets, audio_path):
-    # GET FILES
-    
-    # GET SUBCLIPS FROM OFFSETS
-
-    # LOAD AUDIO
-    # CREATE ORDERED LIST OF SCENES
-    # ASSEMBLE VIDEO CLIPS
-    return
-
+    final_vid = vid_utils.generate_mix(offsets, query.url_to_id(audio_url))
 
 if __name__ == "__main__":
     main()
