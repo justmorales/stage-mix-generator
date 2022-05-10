@@ -2,6 +2,7 @@ from scenedetect import VideoManager, SceneManager, StatsManager, ContentDetecto
 from moviepy.editor import AudioFileClip, VideoFileClip, concatenate_videoclips
 from cvcalib.audiosync import offset
 from query import url_to_id
+from secrets import randbelow
 import numpy as np
 import os
 
@@ -107,19 +108,35 @@ def generate_mix(offsets, audio_id):
 
     # CREATE ORDERED LIST OF SCENES
     clips = []
-    index = 0
-    for step in np.arange(0, official_audio.duration, 5):
-        if step + 5 < v_subclips[index].duration:
-            clips.append(v_subclips[index].subclip(step, step + 5))
 
-        index = (index + 1) % len(v_subclips)
+    scenes = []
+    for v in video_paths:
+        scenes.append(scene_detect(v))
+
+    curr = 0.0
+    while curr < float(official_audio.duration):
+        random = randbelow(len(v_subclips))
+        print(random)
+
+        if curr > float(v_subclips[random].duration) + 2:
+            continue
+    
+        offset_v = list(offsets.values())
+        for i, scene in enumerate(scenes[random]):
+            print(scene[1].get_seconds())
+            scene_end = scene[1].get_seconds() - offset_v[random][1]
+            if scene_end > curr + 1.0 and scene_end < float(official_audio.duration) + 5:
+                clips.append(v_subclips[random].subclip(curr, scene_end))
+                curr = scene_end
+                break
 
     # ASSEMBLE VIDEO CLIPS
+    print(clips)
     final = concatenate_videoclips(clips)
     final = final.set_audio(a_subclips[0])
 
     mix_path = os.path.join(DIR, "final_mix.mp4")
-    final.write_videofile(mix_path)
+    final.write_videofile(mix_path, codec='mpeg4', preset='medium', write_logfile=True, threads=3)
 
     official_audio.reader.close_proc()
 
